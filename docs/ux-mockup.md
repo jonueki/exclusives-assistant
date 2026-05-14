@@ -20,13 +20,13 @@ What changed from round 1 and why. Each row cites the source of the change.
 
 | # | Change | Source | Where it lands |
 |---|---|---|---|
-| C2 | Kill-switch promoted to Must-Have; added three explicit states (active pill, auto-disabled banner, diagnostic panel). | `prd.md:94` moves it from Should → Must; `feasibility.md:131` calls it "hard requirement, not nice-to-have"; `round-1-synthesis.md:36` | New frame `8. Kill-switch states` |
-| C3 | Popup rebuilt as a status + last-second-swap surface. Arming dropped from primary surface; toggles demoted to a Quick Toggles row. | `prd.md:69`, `round-1-synthesis.md:41` | Modify frame `1. Toolbar Popup` |
-| C5 | Dim default tuned so the bowl shape reads and candidate clusters jump out at a glance. | `prd.md:67` ("level that preserves spatial context"), `round-1-synthesis.md:52` | Modify frame `4. Live seat map · overlay on` |
-| C6 | Side-panel collapsed strip (48px) for when TM opens a checkout modal. | `feasibility.md` z-index concern + `round-1-synthesis.md:56` | New frame `7. Side panel — collapsed strip` |
-| C7 | Added 7th pre-flight item: "Profile locked to local snapshot". Hover-explainer references chrome.storage.sync eventual consistency. | `feasibility.md:140` (§5.4), `round-1-synthesis.md:61` | Modify frame `5. Pre-drop arming` |
-| C8 | Candidate `›` action now triggers a pulse-on-seat glow (not scroll). Panel footer microcopy updated. | `prd.md:67`, `round-1-synthesis.md:66` | Modify frame `4. Live seat map · overlay on` |
-| A11y | Match seats get a subtle outer ring in addition to mint color (color-blind-safe). | `round-1-synthesis.md:116`, deuteranopia note | Modify frame `4` + Accessibility section below |
+| C2 | Kill-switch promoted to Must-Have; added three explicit states (active pill, auto-disabled banner, diagnostic panel). | `prd.md` §5 Must Have moves it from Should → Must; `feasibility.md` §4 calls it "hard requirement, not nice-to-have"; `round-1-synthesis.md` C2 row | New frame `8. Kill-switch states` |
+| C3 | Popup rebuilt as a status + last-second-swap surface. Arming dropped from primary surface; toggles demoted to a Quick Toggles row. | `prd.md` §5 Must Have, `round-1-synthesis.md` C3 row | Modify frame `1. Toolbar Popup` |
+| C5 | Dim default tuned so the bowl shape reads and candidate clusters jump out at a glance. | `prd.md` §4c ("level that preserves spatial context"), `round-1-synthesis.md` C5 row | Modify frame `4. Live seat map · overlay on` |
+| C6 | Side-panel collapsed strip (48px) for when TM opens a checkout modal. | `feasibility.md` §R2.1 detection contract + `round-1-synthesis.md` C6 row | New frame `7. Side panel — collapsed strip` |
+| C7 | Added 7th pre-flight item: "Profile locked to local snapshot". Hover-explainer references chrome.storage.sync eventual consistency. | `feasibility.md` §5 risk 4, `round-1-synthesis.md` C7 row | Modify frame `5. Pre-drop arming` |
+| C8 | Candidate `›` action now triggers a pulse-on-seat glow (not scroll). Panel footer microcopy updated. | `prd.md` §4c, `round-1-synthesis.md` C8 row | Modify frame `4. Live seat map · overlay on` |
+| A11y | Match seats get a subtle outer ring in addition to mint color (color-blind-safe). | `round-1-synthesis.md` "color-blind-safe" note, deuteranopia note | Modify frame `4` + Accessibility section below |
 
 ## Frames
 
@@ -45,7 +45,7 @@ What changed from round 1 and why. Each row cites the source of the change.
 
 **User goal:** When TM opens a checkout modal, the side panel must not fight for z-index with TM's UI, but the user must still see that we're alive and be able to expand back to the full panel.
 
-**Entry point:** Whenever the content script detects `body.modal-open` (or equivalent — SWE to confirm in `feasibility.md`). Auto-collapses on detection; user can also collapse manually.
+**Entry point:** Whenever the content script detects a modal open via the body class allowlist (`modal-open`, `dialog-open`, `no-scroll`, `overflow-hidden`), an open `<dialog>` element, or `[role=dialog][aria-modal=true]`, per `feasibility.md` §R2.1 detection contract. Auto-collapses on detection; user can also collapse manually.
 
 **Layout (1440x900 canvas):**
 - Background: dimmed mock of a TM checkout modal (gray rectangle centered, ~720x560, with placeholder "Reviewing your tickets" header and a list of seats). Behind the modal: dimmed seat map from frame 4.
@@ -182,7 +182,7 @@ Add a 7th checklist item between item 6 ("Notifications muted") and the bottom a
    - Label: `Profile locked to local snapshot`
    - Hover/focus inline explainer (tooltip or expanding subtext): `Prevents chrome.storage.sync from overwriting your armed profile mid-drop if you edit it on another device. Recommended on drop day.`
    - Default state: **checked** on the drop-day flow (unlike some other items which default unchecked).
-   - Source: `feasibility.md:140` §5.4 mitigation.
+   - Source: `feasibility.md` §5 risk 4 mitigation.
 
 **Why default checked:** the failure mode (a phone edit silently overwriting the desktop profile 90s before a drop) is silent and catastrophic; the cost of locking (can't sync edits during the session) is negligible during a 60-second arming window.
 
@@ -247,23 +247,23 @@ Moved from "Open questions" with the decision noted. Source column points to whe
 
 | R1 question | R2 decision | Source |
 |---|---|---|
-| Personas of one — designing for 6-months-from-now Jonathan or today Jonathan? | Today Jonathan, plus enough onboarding (frame 6) that 6-months-later Jonathan can re-derive his setup in <10 min. Not a full doc system. | Implicit in `prd.md:18` single-user framing. |
-| Which venues seed v1? | Confirmed (Seattle-area): Climate Pledge Arena, T-Mobile Park, Tacoma Dome, Lumen Field. | `round-1-synthesis.md:82` (user confirmed) |
-| Is post-drop logging a v1 feature? | **No, v2.** No surface in frame 4 for it. | `prd.md:106`, `round-1-synthesis.md:85` |
-| What does "drop day" mean for the kill-switch? | The kill-switch is always on, not drop-day-tagged. Auto-disable + amber banner triggers on any uncaught exception during overlay execution on a TM event page. No tagging UI needed in v1. | `prd.md:94`, `feasibility.md:131` |
-| Inline obstructed-view warnings on the seat map? | **No.** Obstructed info lives in the side panel candidate detail only. No hover detection on TM nodes. | `round-1-synthesis.md:72`, `prd.md:50` |
+| Personas of one — designing for 6-months-from-now Jonathan or today Jonathan? | Today Jonathan, plus enough onboarding (frame 6) that 6-months-later Jonathan can re-derive his setup in <10 min. Not a full doc system. | Implicit in `prd.md` §2 Target User. |
+| Which venues seed v1? | Confirmed (Seattle-area): Climate Pledge Arena, T-Mobile Park, Tacoma Dome, Lumen Field. | `round-1-synthesis.md` Gaps table — venue row (user confirmed) |
+| Is post-drop logging a v1 feature? | **No, v2.** No surface in frame 4 for it. | `prd.md` §5 Won't Have, `round-1-synthesis.md` C-row table |
+| What does "drop day" mean for the kill-switch? | The kill-switch is always on, not drop-day-tagged. Auto-disable + amber banner triggers on any uncaught exception during overlay execution on a TM event page. No tagging UI needed in v1. | `prd.md` §5 Must Have, `feasibility.md` §4 |
+| Inline obstructed-view warnings on the seat map? | **No.** Obstructed info lives in the side panel candidate detail only. No hover detection on TM nodes. | `round-1-synthesis.md` C9 row, `prd.md` §3 Non-Goals |
 
 ### From "Open questions for SWE"
 
 | R1 question | R2 decision | Source |
 |---|---|---|
-| Can the side panel float over TM with `position: fixed`? Z-index fight on modals? | Yes for the default pinned-right panel. On TM modal-open, collapse to a 48px strip (frame 7). SWE to confirm `body.modal-open` (or equivalent) is the detection hook. | `round-1-synthesis.md:58` |
-| Is the seat map SVG or Canvas? | **Unresolved — DevTools session required before coding.** Frame 4 assumes per-seat CSS targeting; if Canvas, this becomes an SVG overlay layer. Design holds; rendering path adapts. | `feasibility.md:163`, `prd.md:132` |
-| Do seat DOM nodes expose price as a number or only a tier? | **Unresolved — DevTools session required.** If tier-only, the candidates list needs tier badges instead of dollar values. Designer to spec both densities once SWE confirms. | `feasibility.md:163`, `prd.md:133` |
-| Can we read TM's map state to scroll-to-seat? | **No promise in v1.** Pulse-on-seat is the v1 behavior (frame 4 R2 diff). Scroll-to-seat is v2 if SWE confirms safe access. | `round-1-synthesis.md:66`, `prd.md:67` |
-| MutationObserver tick rate vs. "last updated Xs ago" honesty? | SWE owns the actual cadence number; designer uses `Xs ago` with `<time datetime>` so the value can come from real timestamps. | `prd.md:134` |
-| Shadow DOM theming via CSS custom properties? | Assume yes; SWE to confirm in `feasibility.md` round 2 follow-up. Mock uses CSS custom props pattern. | `round-1-synthesis.md:108` |
-| Where does the popup get "47 matches"? | Content-script → service-worker → popup via `chrome.runtime.sendMessage` with last-known stats cached in `chrome.storage.session`. Fallback if no page open: popup shows "No active TM tab" empty state. | `round-1-synthesis.md:108` |
+| Can the side panel float over TM with `position: fixed`? Z-index fight on modals? | **Resolved** per `feasibility.md` §R2.1 detection contract — pinned-right panel at `z-index: 2147483000`, collapses to 48px strip on modal signal (body class allowlist / `[role=dialog][aria-modal=true]` / `aria-hidden` priority watcher with 250ms restore debounce). | `round-1-synthesis.md` C6 row |
+| Is the seat map SVG or Canvas? | **Unresolved — DevTools session required before coding.** Frame 4 assumes per-seat CSS targeting; if Canvas, this becomes an SVG overlay layer. Design holds; rendering path adapts. | `feasibility.md` §7 risk 1, `prd.md` §7 Still Open |
+| Do seat DOM nodes expose price as a number or only a tier? | **Unresolved — DevTools session required.** If tier-only, the candidates list needs tier badges instead of dollar values. Designer to spec both densities once SWE confirms. | `feasibility.md` §7 risk 1, `prd.md` §7 Still Open |
+| Can we read TM's map state to scroll-to-seat? | **No promise in v1.** Pulse-on-seat is the v1 behavior (frame 4 R2 diff). Scroll-to-seat is v2 if SWE confirms safe access. | `round-1-synthesis.md` C8 row, `prd.md` §4c |
+| MutationObserver tick rate vs. "last updated Xs ago" honesty? | SWE owns the actual cadence number; designer uses `Xs ago` with `<time datetime>` so the value can come from real timestamps. | `prd.md` §7 Still Open |
+| Shadow DOM theming via CSS custom properties? | **Resolved** per `feasibility.md` §R2.2 — closed shadow root + `--tmx-*` custom props on `:host` is leak-proof per CSS Scoping spec. | `round-1-synthesis.md` C-row table |
+| Where does the popup get "47 matches"? | Content-script → service-worker → popup via `chrome.runtime.sendMessage` with last-known stats cached in `chrome.storage.session`. Fallback if no page open: popup shows "No active TM tab" empty state. Resolved per `feasibility.md` §R2.3. | `round-1-synthesis.md` C-row table |
 
 ## Surfaced in round 2 (new conflicts / gaps)
 

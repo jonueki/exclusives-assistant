@@ -67,13 +67,11 @@ exclusives-assistant/
 │       │   └── build-hash.ts          # Re-export of BUILD_HASH from Vite define.
 │       ├── data/
 │       │   └── venues/                # Bundled venue intel.
-│       │       ├── index.ts           # Barrel: exports the venue map keyed by venueId.
-│       │       ├── msg.json
-│       │       ├── kia-forum.json
-│       │       ├── hollywood-bowl.json
-│       │       ├── red-rocks.json
-│       │       ├── forum-la.json
-│       │       └── ubs-arena.json
+│       │       ├── index.ts                   # Barrel: exports the venue map keyed by venueId.
+│       │       ├── climate-pledge-arena.json
+│       │       ├── t-mobile-park.json
+│       │       ├── tacoma-dome.json
+│       │       └── lumen-field.json
 │       └── styles/
 │           └── overlay.css            # The light-DOM CSS we inject for tmx-match / tmx-dim on TM seats.
 └── tools/
@@ -122,6 +120,7 @@ Notes vs `seat-overlay-architecture.md` §5:
     "type": "module"
   },
   "permissions": ["storage", "activeTab"],
+  "_comment": "Paths below are source-relative (.ts/.tsx/.html). @crxjs/vite-plugin rewrites them to built .js paths during `vite build`. Do not load the raw src/ tree via chrome://extensions — load the dist/ output.",
   "host_permissions": [
     "https://www.ticketmaster.com/event/*"
   ],
@@ -259,6 +258,7 @@ history.pushState = function (...args) {
 type SeatId = string;
 export function apply(matches: Set<SeatId>, allSeats: Set<SeatId>): void;
 export function clear(): void;
+export function pulse(seatId: SeatId, opts?: { reducedMotion?: boolean }): void;
 ```
 
 **Invariants:**
@@ -267,9 +267,17 @@ export function clear(): void;
 - Removes our classes before applying new ones — never leaves stale classes on a re-render.
 - On `clear()` (kill-switch), iterates every node we ever tagged and removes our classes. Tracks a `WeakSet` of tagged nodes to make this O(tagged).
 
+**`pulse(seatId, opts?)` invariants:**
+- Idempotent. No-op if the seat node is not currently in the DOM (e.g., the seat was taken between read and click).
+- No inline styles. Adds a `tmx-pulse-{buildHash}` class to the seat node; the animation is CSS-driven and lives in `styles/overlay.css`.
+- Latest call wins: a subsequent `pulse(seatId)` (same or different seat) removes the pulse class from any in-flight target before retagging, so two rapid clicks don't double-animate or queue.
+- Under `prefers-reduced-motion` (detected via `window.matchMedia` and passed in via `opts.reducedMotion`, or read directly when `opts` is omitted), the pulse degrades to an instant hold — full-opacity outer ring, no expansion — then fades. This matches the accessibility spec in `ux-mockup.md` Accessibility notes.
+- The `SeatId → DOM node` lookup uses the `WeakSet`/`Map` of tagged nodes maintained by `apply()` (the same per-seat map keyed by `SeatId` that `apply()` populates from the observer tick). `overlay.ts` is the only module that owns this lookup; `pulse()` does not re-query the DOM.
+
 **Never:**
 - Never sets `data-*` attributes on TM nodes (would be visible as a behavior change).
 - Never modifies TM-owned classes — only adds and removes our own prefixed classes.
+- `pulse()` never sets inline `style` and never uses `Element.animate()` (we don't want a Web Animations API surface inspectable from the page).
 
 ### 3.5 `content/isolated/panel/`
 
@@ -279,6 +287,8 @@ export function clear(): void;
 ```ts
 export function mountPanel(): { setStats: (s: Stats) => void; teardown: () => void };
 ```
+
+**Data path for `setStats`:** the isolated-world entry (`content/isolated/index.ts`) is the sole caller. It computes stats from the seat reader on each observer tick and invokes `setStats({ matches, total, medianPrice, lastUpdatedAt })`. The popup's `47 matches` reads through the SW relay (per `feasibility.md` §R2.3), not through this function — `setStats` only feeds the in-page panel.
 
 Components:
 - `Panel.tsx` — layout shell, theme-token application on `:host`, modal-collapsed state binding.
@@ -314,6 +324,8 @@ score = sectionQuality * rowQuality * priceValue * adjacencyBonus
 **Invariants:**
 - Pure: same inputs → same outputs. No `Date.now()`, no `Math.random()`.
 - Returns a number in `[0, 1]`. Asserts (in dev builds) the result is finite and in range.
+- **Missing `sectionQuality` fallback:** if `venue.stageConfigs[stageConfig].sectionQuality[seat.section]` is `undefined` (we haven't authored intel for this section yet), `sectionQuality` defaults to a neutral `0.5`. Never throws on missing data; never silently drops the seat from ranking.
+- **Tier-only price fallback:** when `seat.price` is `undefined` but `seat.priceTier` is set (Strategy A returned tier-only), `priceValue` is computed from `venue.tierToPriceRange[seat.priceTier]` midpoint. If the venue has no tier map either, `priceValue` defaults to `0.5` and the seat is flagged in the diagnostic log.
 
 **Never:**
 - Never reads `chrome.storage`, never calls `console.log` in production builds.
@@ -342,7 +354,7 @@ export function matches(seat: Seat, profile: ValueProfile, neighbors: Seat[]): b
 
 **Invariants:**
 - Pure.
-- A seat with `price === undefined` (Strategy A returned tier only, no exact price) is treated as **passing** the price filter only if the corresponding tier maps under `maxPrice`. The mapping is provided by `lib/profile.ts` from the venue intel.
+- A seat with `price === undefined` (Strategy A returned tier only, no exact price) is treated as **passing** the price filter only if the corresponding tier maps under `maxPrice`. The mapping comes from `VenueIntel.tierToPriceRange` (added in §3.13 schema delta); `lib/profile.ts` reads it and uses the tier's `max` for the compare. If no tier map exists for the venue, the seat is treated as **passing** with a diagnostic-log warning (we'd rather show a candidate that turns out to be over budget than hide it silently).
 
 **Never:**
 - Never mutates `profile` or `seat`.
@@ -483,7 +495,13 @@ Both render in their own document context (not in TM page), so no Shadow DOM nee
 
 ### 3.13 `data/venues/`
 
-Bundled venue intel JSONs. Initial keys (round-1 default list, pending user confirm): `msg.json`, `kia-forum.json`, `hollywood-bowl.json`, `red-rocks.json`, `forum-la.json`, `ubs-arena.json`. Data fills incrementally; each file may ship empty `sectionQuality` maps in v1. Schema unchanged from architecture §8.
+Bundled venue intel JSONs. Initial keys (confirmed Seattle-area venue list): `climate-pledge-arena.json`, `t-mobile-park.json`, `tacoma-dome.json`, `lumen-field.json`. Data fills incrementally; each file may ship empty `sectionQuality` maps in v1. Schema as in architecture §8, plus the `tierToPriceRange` addition described in §3.6.
+
+**Barrel:** `data/venues/index.ts` exports `const VENUES: Record<string, VenueIntel>` keyed by `venueId`. All venue lookups go through this map; per-file JSON imports stay internal to the barrel.
+
+**Empty-state behavior:**
+- `sectionQuality` may be `{}` in v1 (we author it as we attend shows). Scoring falls back to a neutral `0.5` when a section is missing from the map (see §3.6).
+- `stageConfigs` MUST contain at least one entry per venue file (e.g., `"end-stage"`) so lookups never return `undefined` and the scoring path does not NPE. A venue with no real intel still ships a single empty stage config rather than an empty object.
 
 ---
 
@@ -596,7 +614,7 @@ A signed-off checklist. Every item is verifiable; none are vibes-based.
 - [ ] **Strategy B static check:** §7 ESLint rules pass; grep for `window.fetch =`, `XMLHttpRequest.prototype`, `Response.prototype` returns zero hits.
 - [ ] **Canary recorded on boot:** load any TM event page; assert `tmx.canary` has at least one reading from the current session.
 - [ ] **Service-worker stub:** SW handles `STATS_GET` and `STATS` messages; cold-start latency measured < 100ms with `performance.now()`.
-- [ ] **`chrome.storage.sync` quota:** profile JSON size under 8KB per profile (quota is 8KB per item, 100KB total).
+- [ ] **`chrome.storage.sync` quota:** profile JSON size under 8KB per profile (Chrome's documented quotas: 8,192 bytes per item, 102,400 bytes total).
 - [ ] **Shadow DOM mode:** every `attachShadow` call in source uses `{ mode: 'closed' }`. Grep confirms.
 - [ ] **Build hash threaded:** `BUILD_HASH` is non-empty at runtime; `tmx-*` class names include it; rebuilding produces a different hash.
 - [ ] **Soft-launch event chosen:** a low-stakes event (general-on-sale, plenty of inventory, no resale value if the account is suspended — e.g., a comedy show or local theater event) is bookmarked. We use this drop, not a target drop, as the first real run.

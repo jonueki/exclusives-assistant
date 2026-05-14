@@ -1,5 +1,12 @@
 # Ticketmaster Seat Overlay — Architecture (v0 draft)
 
+> **Status: v0 draft, superseded by round-2 specs.** Read alongside `feasibility.md`, `prd.md`, and `v1-build-plan.md` — those are the authoritative current specs.
+>
+> Specific deltas:
+> - **Strategy B** (§4.2, §10 risk-table row, §12 v3 roadmap row): permanently excluded per `feasibility.md` §R2.4 and `round-1-synthesis.md` C-alignment. Do not implement.
+> - **Venue list** (§5 file tree): superseded by `prd.md` §3 — confirmed Seattle-area list is Climate Pledge Arena, T-Mobile Park, Tacoma Dome, Lumen Field.
+> - **Scoring formula** (§7) and **value-profile schema** (§6) remain authoritative; `v1-build-plan.md` §3.6/§3.7 inherits them.
+
 A Chrome extension that helps **you** (a human, not a bot) pick a good-value seat faster on Ticketmaster's interactive seat map. It is a passive visual layer over the page you are already looking at — no automation, no extra network calls to TM, no synthetic events.
 
 > Guiding principle: **Don't be faster at clicking. Be faster at deciding.**
@@ -215,6 +222,10 @@ type VenueIntel = {
       notes?: { [section: string]: string };
     };
   };
+  // Round-2 addition (v1-build-plan §3.6/§3.7). Used when Strategy A returns
+  // a price tier on the seat node but no exact price. Optional — scoring falls
+  // back to a neutral 0.5 priceValue if absent.
+  tierToPriceRange?: { [tier: string]: { min: number; max: number } };
 };
 ```
 
