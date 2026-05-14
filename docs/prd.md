@@ -37,7 +37,7 @@ Single user: Jonathan. No other users in v1, no multi-tenant, no sharing.
 - Be invisible from Ticketmaster's perspective.
 
 ### Non-Goals (v1)
-- **No automation of any kind.** No synthetic clicks, no auto-cart, no auto-checkout. See arch doc lines 20–28.
+- **No automation of any kind.** No synthetic clicks, no auto-cart, no auto-checkout. See `seat-overlay-architecture.md` §1 Non-goals.
 - **No additional network calls to Ticketmaster.** Read-only on the live page.
 - **No DOM event spoofing, no queue automation, no fingerprint or anti-detect modifications.**
 - **Not a resale tool.** No resale value data, no flip-profit scoring.
@@ -56,7 +56,7 @@ Single user: Jonathan. No other users in v1, no multi-tenant, no sharing.
 
 ### 4a. Pre-Drop Preparation (days before the sale)
 
-Jonathan hears a tour is announced for a venue he knows — say, Climate Pledge Arena. He opens the extension options page and either selects an existing profile or creates one: "Lower bowl, Sections 110–114, rows D–P, max $230, 2+ adjacent." He loads or reviews the Climate Pledge Arena venue intel sheet (bundled in the extension per arch doc line 138), checks that the section quality numbers look right from his last show there, and adjusts if the stage config is different this time (e.g., end-stage vs in-the-round). He saves the profile and tags it to this drop. On drop day, he opens the TM event page in Chrome, sees the extension toolbar icon, confirms the right profile is armed in the popup, and clicks into the queue.
+Jonathan hears a tour is announced for a venue he knows — say, Climate Pledge Arena. He opens the extension options page and either selects an existing profile or creates one: "Lower bowl, Sections 110–114, rows D–P, max $230, 2+ adjacent." He loads or reviews the Climate Pledge Arena venue intel sheet (bundled in the extension per `v1-build-plan.md` §3.13), checks that the section quality numbers look right from his last show there, and adjusts if the stage config is different this time (e.g., end-stage vs in-the-round). He saves the profile and tags it to this drop. On drop day, he opens the TM event page in Chrome, sees the extension toolbar icon, confirms the right profile is armed in the popup, and clicks into the queue.
 
 ### 4b. Drop Day in Queue (waiting, pre-map)
 

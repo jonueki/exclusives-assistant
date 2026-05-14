@@ -265,14 +265,14 @@ export function pulse(seatId: SeatId, opts?: { reducedMotion?: boolean }): void;
 - Only mutates `classList`. No inline style. No attribute writes other than `classList`.
 - Uses a build-hash-suffixed class name (e.g., `tmx-match-7f3a9b`) loaded from `lib/build-hash.ts`. The CSS rules in `styles/overlay.css` are templated at build time to match.
 - Removes our classes before applying new ones — never leaves stale classes on a re-render.
-- On `clear()` (kill-switch), iterates every node we ever tagged and removes our classes. Tracks a `WeakSet` of tagged nodes to make this O(tagged).
+- On `clear()` (kill-switch), iterates every node we ever tagged and removes our classes. Tracks two structures internally: a `WeakSet<Element>` for the iterable-cleanup invariant of `clear()`, and a `Map<SeatId, WeakRef<Element>>` for `pulse()`'s `SeatId → node` lookup. `apply()` populates both each tick; `pulse()` reads only the Map.
 
 **`pulse(seatId, opts?)` invariants:**
 - Idempotent. No-op if the seat node is not currently in the DOM (e.g., the seat was taken between read and click).
 - No inline styles. Adds a `tmx-pulse-{buildHash}` class to the seat node; the animation is CSS-driven and lives in `styles/overlay.css`.
 - Latest call wins: a subsequent `pulse(seatId)` (same or different seat) removes the pulse class from any in-flight target before retagging, so two rapid clicks don't double-animate or queue.
 - Under `prefers-reduced-motion` (detected via `window.matchMedia` and passed in via `opts.reducedMotion`, or read directly when `opts` is omitted), the pulse degrades to an instant hold — full-opacity outer ring, no expansion — then fades. This matches the accessibility spec in `ux-mockup.md` Accessibility notes.
-- The `SeatId → DOM node` lookup uses the `WeakSet`/`Map` of tagged nodes maintained by `apply()` (the same per-seat map keyed by `SeatId` that `apply()` populates from the observer tick). `overlay.ts` is the only module that owns this lookup; `pulse()` does not re-query the DOM.
+- The `SeatId → DOM node` lookup uses the `Map<SeatId, WeakRef<Element>>` maintained by `apply()` (see the apply-invariants above). `overlay.ts` is the only module that owns this lookup; `pulse()` does not re-query the DOM. A stale `WeakRef` (node GC'd) is treated as "seat not in DOM" and the call no-ops.
 
 **Never:**
 - Never sets `data-*` attributes on TM nodes (would be visible as a behavior change).
@@ -373,6 +373,7 @@ export const StorageKeys = {
   canary:      'tmx.canary',          // local
   diagnosticLog: 'tmx.diagnostic-log',// local
   snapshotLock: 'tmx.snapshot-lock',  // local — { lockedAt, profileSnapshot }
+  popupStats:  'tmx.popup-stats',     // session — last-known { matches, total, medianPrice, lastUpdatedAt } for the popup; SW-owned (feasibility.md §R2.3)
 } as const;
 
 export async function get<K extends keyof Schema>(k: K): Promise<Schema[K] | undefined>;
@@ -497,7 +498,13 @@ Both render in their own document context (not in TM page), so no Shadow DOM nee
 
 Bundled venue intel JSONs. Initial keys (confirmed Seattle-area venue list): `climate-pledge-arena.json`, `t-mobile-park.json`, `tacoma-dome.json`, `lumen-field.json`. Data fills incrementally; each file may ship empty `sectionQuality` maps in v1. Schema as in architecture §8, plus the `tierToPriceRange` addition described in §3.6.
 
-**Barrel:** `data/venues/index.ts` exports `const VENUES: Record<string, VenueIntel>` keyed by `venueId`. All venue lookups go through this map; per-file JSON imports stay internal to the barrel.
+**Barrel:** `data/venues/index.ts` exports `const VENUES: Record<string, VenueIntel>` keyed by `venueId`. **Keying contract:** `venueId` is the kebab-case slug that matches the JSON filename (e.g., `"climate-pledge-arena"`). Each venue JSON also carries its own `venueId` field; the barrel asserts at build time that the filename slug equals the in-file `venueId`. All venue lookups go through this map; per-file JSON imports stay internal to the barrel.
+
+**`tierToPriceRange` schema** (R2 addition, used by `lib/scoring.ts` §3.6 and `lib/profile.ts` §3.7 as the tier→price fallback):
+```ts
+tierToPriceRange?: Record<string, { min: number; max: number; mid: number }>;
+```
+`mid` is the explicit midpoint used by `priceValue` fallback. Authoring this field is optional per venue; if absent, scoring falls back to neutral `0.5` and `lib/profile.ts` lets tier-only seats pass the `maxPrice` filter (with a diagnostic-log warning).
 
 **Empty-state behavior:**
 - `sectionQuality` may be `{}` in v1 (we author it as we attend shows). Scoring falls back to a neutral `0.5` when a section is missing from the map (see §3.6).
